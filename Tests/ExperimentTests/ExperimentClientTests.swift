@@ -344,6 +344,33 @@ class ExperimentClientTests: XCTestCase {
         let storedUser = client.getUser()
         XCTAssertEqual(storedUser, user)
     }
+
+    func testInitialVariantIsUsedIfRemoteValueDoesNotExist() {
+        let expectedValue = "initial-variant-value-123"
+        let initialVariant = Variant(expectedValue, payload: nil)
+        let keyNotInRemote = "test-does-not-exist-in-remote-123"
+        var initialVariantsNotInRemote = [String: Variant]()
+        initialVariantsNotInRemote[keyNotInRemote] = initialVariant
+
+        let client = DefaultExperimentClient(
+            apiKey: API_KEY,
+            config: ExperimentConfigBuilder()
+                .debug(true)
+                .initialVariants(initialVariants)
+                .source(.LocalStorage)
+                .build(),
+            storage: InMemoryStorage()
+        )
+        let s = DispatchSemaphore(value: 0)
+        client.fetch(user: testUser) { (client, error) in
+            let variant = client.variant(keyNotInRemote, fallback: nil)
+            XCTAssertNotNil(variant)
+            XCTAssertEqual(expectedValue, variant.value, "Initial variant value should be returned")
+            XCTAssertNil(variant.payload)
+            s.signal()
+        }
+        s.wait()
+    }
 }
 
 class TestAnalyticsProvider : ExperimentAnalyticsProvider {
